@@ -1,0 +1,19 @@
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      docker: 18
+  pre_build:
+    commands:
+      - AccountID=$(aws sts get-caller-identity --query Account --output text)
+      - $(aws ecr get-login --registry-ids $AccountID --no-include-email --region ${AWS_DEFAULT_REGION})
+      - REPOSITORY_URI="$AccountID.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/ms01"
+  build:
+    commands:
+        - docker build -t ${REPOSITORY_URI}:latest .
+  post_build:
+    commands:
+      - docker push ${REPOSITORY_URI}:latest
+      - printf '[{"name":"task-ms01","imageUri":"%s:latest"}]' "$REPOSITORY_URI" > taskdef.json
+artifacts:
+  files: taskdef.json
