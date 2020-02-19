@@ -1,10 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Deploy a service on AWS Fargate, hosted in a private subnet,
-              but accessible via a public load balancer.
-
-
+Description: Deploy a service on AWS Fargate, hosted in a private subnet, but accessible via a public load balancer.
 Parameters:
-
   ServiceName:
     Type: String
     Description: A name for the service
@@ -24,18 +20,6 @@ Parameters:
     Description: The priority for the routing rule added to the load balancer.
                  This only applies if your have multiple services which have been
                  assigned to different paths on the load balancer.
-  MinContainers:
-    Type: Number
-    Default: 2
-  # for autoscaling
-  MaxContainers:
-    Type: Number
-    Default: 100
-  # target CPU utilization (%)
-  AutoScalingTargetValue:
-    Type: Number
-    Default: 50
-    Description: arget CPU utilization (%)
   ContainerCpu:
     Type: Number
     Default: 256
@@ -77,38 +61,6 @@ Parameters:
     Default: '/DevTools/PublicListener'
 
 
-
-Metadata:
-  AWS::CloudFormation::Interface:
-    ParameterGroups:
-      -
-        Label:
-          default: "SERVICE CONFIGURATION"
-        Parameters:
-          - ServiceName
-          - ContainerPort
-          - DesiredCount
-      -
-        Label:
-          default: "CONTAINER CONFIGURATION"
-        Parameters:
-          - ContainerCpu
-          - ContainerMemory
-      -
-        Label:
-          default: "LOAD BALANCER CONFIGURATION"
-        Parameters:
-          - Path
-          - Priority
-      -
-        Label:
-          default: "AUTO SCALING CONFIGURATION"
-        Parameters:
-          - MinContainers
-          - MaxContainers
-          - AutoScalingTargetValue
-
-
 Resources:
 
   #-----------------------------------------------------------------------------#
@@ -140,6 +92,7 @@ Resources:
                 - "codebuild.amazonaws.com"
             Action:
               - ecr:*
+
 
 
   # The task definition. This is a simple metadata description of what
@@ -178,8 +131,6 @@ Resources:
     Properties:
       ServiceName: !Ref 'ServiceName'
       Cluster: !Ref ClusterName
-      EnableECSManagedTags: true
-      PropagateTags: SERVICE
       LaunchType: FARGATE
       DeploymentConfiguration:
         MaximumPercent: 200
@@ -228,49 +179,6 @@ Resources:
           Type: 'forward'
       Conditions:
         - Field: path-pattern
-          Values: [!Ref 'Path']
+          Values: ['!Ref Path']
       ListenerArn: !Ref PublicListener
       Priority: !Ref 'Priority'
-
-  LogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Join ['', [/ecs/, !Ref ServiceName, TaskDefinition]]
-
-  AutoScalingTarget:
-    Type: AWS::ApplicationAutoScaling::ScalableTarget
-    Properties:
-      MinCapacity: !Ref MinContainers
-      MaxCapacity: !Ref MaxContainers
-      ResourceId: !Join ['/', [service, !Ref ClusterName, !Ref ServiceName]]
-      ScalableDimension: ecs:service:DesiredCount
-      ServiceNamespace: ecs
-      # "The Amazon Resource Name (ARN) of an AWS Identity and Access Management (IAM) role that allows Application Auto Scaling to modify your scalable target."
-      RoleARN: !GetAtt AutoScalingRole.Arn
-
-  AutoScalingPolicy:
-    Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    Properties:
-      PolicyName: !Join ['', [!Ref ServiceName, AutoScalingPolicy]]
-      PolicyType: TargetTrackingScaling
-      ScalingTargetId: !Ref AutoScalingTarget
-      TargetTrackingScalingPolicyConfiguration:
-        PredefinedMetricSpecification:
-          PredefinedMetricType: ECSServiceAverageCPUUtilization
-        ScaleInCooldown: 10
-        ScaleOutCooldown: 10
-        # Keep things at or lower than 50% CPU utilization, for example
-        TargetValue: !Ref AutoScalingTargetValue
-
-  AutoScalingRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Join ['', [!Ref ServiceName, AutoScalingRole]]
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole'
