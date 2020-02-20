@@ -135,13 +135,13 @@ Resources:
                 EnvironmentVariables: !Sub |
                   [
                     {
-                            "name":"commit_id",
+                            "name":"GitCommitID",
                             "value":"#{SourceVariables.CommitId}",
                             "type":"PLAINTEXT"
                         },
                         {
                             "name":"ServiceName",
-                            "value":" ${ServiceName}",
+                            "value":"${ServiceName}",
                             "type":"PLAINTEXT"
                         }
                     ]
@@ -316,7 +316,9 @@ Resources:
         - arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess
         - arn:aws:iam::aws:policy/CloudWatchFullAccess
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
-#        - arn:aws:iam::aws:policy/job-function/SystemAdministrator
+        - arn:aws:iam::aws:policy/AWSCodeDeployRoleForECS
+        - arn:aws:iam::aws:policy/AmazonECS_FullAccess
+
 
   #-----------------------------------------------------------------------------#
   # Role for CodeBuild service
