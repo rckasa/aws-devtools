@@ -19,7 +19,7 @@ Resources:
   Pipeline:
     Type: "AWS::CodePipeline::Pipeline"
     Properties:
-      Name: MyPipeline
+      Name: !Ref ServiceName
       RoleArn: !GetAtt CodePipelineRole.Arn
       ArtifactStore:
         Type: S3
@@ -273,7 +273,7 @@ Resources:
   BucketArtifact:
     Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: !Sub ${AWS::AccountId}-$(ServiceName)-artifacts
+      BucketName: !Sub ${AWS::AccountId}-${ServiceName}-artifacts
 
   BucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -312,7 +312,11 @@ Resources:
       Path: /
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AWSCodePipelineFullAccess
-        - arn:aws:iam::aws:policy/AWSCodeCommitPowerUser
+        - arn:aws:iam::aws:policy/AWSCodeCommitFullAccess
+        - arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess
+        - arn:aws:iam::aws:policy/CloudWatchFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+#        - arn:aws:iam::aws:policy/job-function/SystemAdministrator
 
   #-----------------------------------------------------------------------------#
   # Role for CodeBuild service
@@ -332,3 +336,5 @@ Resources:
         - arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser
         - arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess
+        - arn:aws:iam::aws:policy/CloudWatchFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
