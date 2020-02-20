@@ -110,3 +110,12 @@ Resources:
       Type: "String"
       Value: !Ref ECSTaskExecutionRole
       Description: The ARN of the ECS Task Execution role
+
+  SSMTokenAqua:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: "/DevTools/TokenAqua"
+      Type: "String"
+      Value: "ZWQzMTk0MGZiYmQ4"
+      Description: Token for AquaMicroScanner
+
