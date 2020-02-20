@@ -1,0 +1,334 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Pipeline CI/CD Example"
+
+
+Parameters:
+  ServiceName:
+    Type: String
+  ClusterName:
+    Type:  'AWS::SSM::Parameter::Value<String>'
+    Default: '/DevTools/ClusterName'
+
+
+Resources:
+
+
+  #-----------------------------------------------------------------------------#
+  # CodePipeline
+  #-----------------------------------------------------------------------------#
+  Pipeline:
+    Type: "AWS::CodePipeline::Pipeline"
+    Properties:
+      Name: MyPipeline
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref BucketArtifact
+      Stages:
+
+        #-----------------------------------------------------------------------------#
+        # Source
+        #-----------------------------------------------------------------------------#
+        - Name: Source
+          Actions:
+            - Name: App
+              Namespace: "SourceVariables"
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: "1"
+                Provider: CodeCommit
+              Configuration:
+                RepositoryName: !Ref ServiceName
+                BranchName: master
+              OutputArtifacts:
+                - Name: App
+              RunOrder: 1
+
+        #-----------------------------------------------------------------------------#
+        # Continuous Integration
+        #-----------------------------------------------------------------------------#
+        - Name: Continuous-Integration
+          Actions:
+            - Name: GitSecret
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: "1"
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: GitSecret
+              InputArtifacts:
+                - Name: App
+              Configuration:
+                ProjectName: !Ref GitSecret
+              RunOrder: 1
+
+            - Name: CfnLint
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: "1"
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: cfn-lint
+              InputArtifacts:
+                - Name: App
+              Configuration:
+                ProjectName: !Ref CfnLint
+              RunOrder: 1
+
+            - Name: CfnNag
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: "1"
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: cfn-nag
+              InputArtifacts:
+                - Name: App
+              Configuration:
+                ProjectName: !Ref CfnNag
+              RunOrder: 1
+
+            - Name: HadoLint
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: "1"
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: HadoLint
+              InputArtifacts:
+                - Name: App
+              Configuration:
+                ProjectName: !Ref HadoLint
+              RunOrder: 1
+
+            - Name: Aqua
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: "1"
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: Aqua
+              InputArtifacts:
+                - Name: App
+              Configuration:
+                ProjectName: !Ref Aqua
+              RunOrder: 2
+
+            - Name: Publish
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: "1"
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: Publish
+              InputArtifacts:
+                - Name: App
+              Configuration:
+                ProjectName: !Ref Publish
+                EnvironmentVariables: !Sub |
+                  [
+                    {
+                            "name":"commit_id",
+                            "value":"#{SourceVariables.CommitId}",
+                            "type":"PLAINTEXT"
+                        },
+                        {
+                            "name":"ServiceName",
+                            "value":" ${ServiceName}",
+                            "type":"PLAINTEXT"
+                        }
+                    ]
+              RunOrder: 3
+
+        #-----------------------------------------------------------------------------#
+        # Continuous Deployment
+        #-----------------------------------------------------------------------------#
+        - Name: Continuous-Deployment
+          Actions:
+
+            - Name: Deploy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: ECS
+              Configuration:
+                ClusterName: !Ref ClusterName
+                ServiceName: !Ref ServiceName
+                FileName: taskdef.json
+              InputArtifacts:
+                - Name: Publish
+              RunOrder: 1
+
+
+  #-----------------------------------------------------------------------------#
+  # CodeBuild Project
+  #-----------------------------------------------------------------------------#
+  GitSecret:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:2.0
+        PrivilegedMode: true
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec/gitsecret.yaml
+      TimeoutInMinutes: 10
+
+  CfnLint:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:2.0
+        PrivilegedMode: true
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec/cfn-lint.yaml
+      TimeoutInMinutes: 10
+
+  CfnNag:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:2.0
+        PrivilegedMode: true
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec/cfn-nag.yaml
+      TimeoutInMinutes: 10
+
+  HadoLint:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:2.0
+        PrivilegedMode: true
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec/hadolint.yaml
+      TimeoutInMinutes: 10
+
+  Aqua:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:2.0
+        PrivilegedMode: true
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec/image-scan.yaml
+      TimeoutInMinutes: 10
+
+  Publish:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:2.0
+        PrivilegedMode: true
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec/publish.yaml
+      TimeoutInMinutes: 10
+
+  #-----------------------------------------------------------------------------#
+  # S3
+  #-----------------------------------------------------------------------------#
+  BucketArtifact:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub ${AWS::AccountId}-$(ServiceName)-artifacts
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BucketArtifact
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - s3:PutObject
+              - s3:GetBucketPolicy
+              - s3:GetObject
+              - s3:ListBucket
+            Effect: Allow
+            Resource:
+              - !Sub arn:aws:s3:::${BucketArtifact}
+              - !Sub arn:aws:s3:::${BucketArtifact}/*
+            Principal:
+              AWS:
+                - !Sub arn:aws:iam::${AWS::AccountId}:root
+
+
+  #-----------------------------------------------------------------------------#
+  # Role for CodePipeline service
+  #-----------------------------------------------------------------------------#
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [codepipeline.amazonaws.com]
+        Version: '2012-10-17'
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodePipelineFullAccess
+        - arn:aws:iam::aws:policy/AWSCodeCommitPowerUser
+
+  #-----------------------------------------------------------------------------#
+  # Role for CodeBuild service
+  #-----------------------------------------------------------------------------#
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [codebuild.amazonaws.com]
+        Version: '2012-10-17'
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser
+        - arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess

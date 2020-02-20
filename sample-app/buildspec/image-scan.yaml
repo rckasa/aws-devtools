@@ -10,7 +10,7 @@ phases:
   build:
     commands:
       - echo Building the Docker image to Aqua analysis..
-      - echo "\r\n" >> Dockerfile
+      - echo "" >> Dockerfile
       - echo "ADD https://get.aquasec.com/microscanner ." >> Dockerfile
       - echo "RUN chmod +x microscanner" >> Dockerfile
       - echo "RUN ./microscanner $TokenAqua --html --continue-on-failure " >> Dockerfile

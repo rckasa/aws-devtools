@@ -2,12 +2,11 @@ import socket
 from flask import Flask
 app = Flask(__name__)
 
-@app.route("/teste-python")
+@app.route("/cadastro")
 def hello():
     html = "<h3>AWS Sample App!</h3><br/>" \
-            "<h2>teste-python v0.0 </h2>" \
-           "<b>Hostname:</b> {hostname}<br/>" \
-            "My Password is: secret123"
+            "<h2>cadastro v0.0 </h2>" \
+           "<b>Hostname:</b> {hostname}<br/>"
 
     return html.format(hostname=socket.gethostname())
 
